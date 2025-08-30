@@ -1,0 +1,33 @@
+Source code:
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const app = express();
+
+const PUBLIC_KEYS = {
+  'trustedKeyId': '-----BEGIN PUBLIC KEY-----\n...trusted key...\n-----END PUBLIC KEY-----'
+};
+
+function verifyJWT(token) {
+  const decoded = jwt.decode(token, { complete: true });
+  const header = decoded.header;
+
+  if (header.alg !== 'RS256' || !header.kid) return null;
+
+  const key = PUBLIC_KEYS[header.kid];
+  if (!key) return null;
+
+  try {
+    return jwt.verify(token, key, { algorithms: ['RS256'] });
+  } catch {
+    return null;
+  }
+}
+
+app.get('/protected', (req, res) => {
+  const auth = req.headers.authorization?.split(' ')[1];
+  const payload = auth && verifyJWT(auth);
+  if (!payload) return res.status(401).send('Unauthorized');
+  res.send(`Hello ${payload.sub}, you are authenticated`);
+});
+
+app.listen(3000);
